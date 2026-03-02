@@ -11,10 +11,10 @@ An open-source tool for flashing and backing up the firmware and SPI flash data 
 - Serial communication with selectable baud rates
 
 ## Requirements
-- GCC (Linux or Windows, MinGW)
+- GCC (Linux or Windows with Cygwin)
 - make
 - Standard C library
-- Access to a serial port (e.g. /dev/ttyUSB0 or COMx)
+- Access to a serial port (e.g. /dev/ttyUSB0)
 
 ## Build Instructions
 
@@ -49,7 +49,7 @@ This will create the executable `rt890-spi-flasher` (or `rt890-spi-flasher.exe` 
 ./rt890-spi-flasher -p /dev/ttyUSB0 -r backup.bin
 ```
 
-**Program SPI flash:**
+**Program SPI flash and verify pages written:**
 
 ```sh
 ./rt890-spi-flasher -p /dev/ttyUSB0 -w image.bin -v
@@ -74,3 +74,4 @@ MIT License — see file headers in the source code.
 ## Disclaimer
 
 This tool is provided as-is, without any warranty. Use at your own risk!
+
