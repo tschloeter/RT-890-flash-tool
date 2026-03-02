@@ -35,7 +35,6 @@
 #define SFLASH_PAGE_SIZE						(4096u)
 #define SFLASH_SIZE								(1024u * SFLASH_PAGE_SIZE)
 #define E_PAGE_NOK								(-2)
-#define PRINT_PAGES_PER_LINE                    (16)
 
 int dump_spi_memory(int fd_serial, char const *sflash_output_image, bool force);
 void *read_sflash_image(int fd);
