@@ -36,6 +36,82 @@
 #include "file-ops.h"
 #include "spi-flash.h"
 
+static int initiate_programming(int fd_serial)
+{
+	uint8_t response;
+	uint8_t message[] = { RADTEL_CMD_PROG_SESSION, 0x38, 0x05, 0x10, 0x00 };
+	message[4] = checksum(message, 4);
+
+	printf("Sending command 0x35 to prepare programming.\n");
+
+	serial_flush(fd_serial);
+
+	if (sizeof(message) != serial_send(fd_serial, message, sizeof(message)))
+	{
+		fprintf(stderr, "Error transmitting command to prepare programming to device.\n");
+		return E_FAILURE;
+	}
+
+	if (1 != serial_receive(fd_serial, &response, 1, 2.0))
+	{
+		fprintf(stderr, "Error receiving response from device.\n");
+		return E_FAILURE;
+	}
+
+	serial_flush(fd_serial);
+
+	switch (response)
+	{
+	case RADTEL_RECV_OK:
+		return E_SUCCESS;
+	case RADTEL_RECV_NOK:
+		return E_FAILURE;
+	default:
+	}
+	return E_FAILURE;
+}
+
+static int write_factory_dataset(int fd_serial)
+{
+	uint8_t read_message[] = { RADTEL_CMD_PROG_SESSION, 0x38, 0x05, 0xEE, 0x00 };
+	read_message[4] = checksum(read_message, 4);
+
+	printf("Sending command 0x35 to finalize programming and restart device.\n");
+
+	serial_flush(fd_serial);
+
+	if (sizeof(read_message) != serial_send(fd_serial, read_message, sizeof(read_message)))
+	{
+		fprintf(stderr, "Error transmitting command to prepare programming to device.\n");
+		return E_FAILURE;
+	}
+
+	serial_flush(fd_serial);
+
+	return E_SUCCESS;
+}
+
+static bool sflash_page_reachable(uint16_t page, bool random_access)
+{
+	if ((true == random_access)
+	|| (page < (RADTEL_ADDR_AUDIO + RADTEL_SIZE_AUDIO))
+	|| ((page >= RADTEL_ADDR_2D0) && (page < (RADTEL_ADDR_2D0 + RADTEL_SIZE_2D0)))
+	|| ((page >= RADTEL_ADDR_FONT_EXT) && (page < (RADTEL_ADDR_FONT_EXT + RADTEL_SIZE_FONT_EXT)))
+	|| ((page >= RADTEL_ADDR_FONT_STD) && (page < (RADTEL_ADDR_FONT_STD + RADTEL_SIZE_FONT_STD)))
+	|| ((page >= RADTEL_ADDR_IMG_LOGO) && (page < (RADTEL_ADDR_IMG_LOGO + RADTEL_SIZE_IMG_LOGO)))
+	|| (page == RADTEL_ADDR_CALIBRATION)
+	|| ((page >= RADTEL_ADDR_SETTINGS) && (page < (RADTEL_ADDR_SETTINGS + RADTEL_SIZE_SETTINGS)))
+	|| ((page >= RADTEL_ADDR_3D8) && (page < (RADTEL_ADDR_3D8 + RADTEL_SIZE_3D8)))
+	|| ((page >= RADTEL_ADDR_31C) && (page < (RADTEL_ADDR_31C + RADTEL_SIZE_31C))))
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
 int dump_spi_memory(int fd_serial, char const *sflash_output_image, bool force)
 {
 	uint8_t *flash_buffer = (uint8_t *) read_sflash_image(fd_serial);
@@ -161,33 +237,58 @@ int flash_spi_memory(int fd_serial, char const *sflash_input_image, bool verify_
 
 int write_sflash_image(int fd, uint8_t const *buffer, bool verify_after_write)
 {
+	static bool random_access = true;
+	static bool first_page_written = false;
 	uint8_t const *write_position = buffer;
+
+	if (E_SUCCESS != initiate_programming(fd))
+	{
+		fprintf(stderr, "Command 0x35 to radio device failed. Could not initiate programming.\n");
+		return E_FAILURE;
+	}
 
 	printf("Sending flash pages to device:\n");
 	for (uint16_t page = 0; page < SFLASH_SIZE / SFLASH_PAGE_SIZE; page++)
 	{
-		printf("0x%04X", page); fflush(stdout);
+		printf("0x%04X:", page); fflush(stdout);
 
-		if (E_SUCCESS != write_sflash_page(fd, page, write_position))
+		if (true == sflash_page_reachable(page, random_access))
 		{
-			return E_FAILURE;
-		}
-		if (verify_after_write)
-		{
-			printf(":W"); fflush(stdout);
-			if (E_SUCCESS != verify_sflash_page(fd, page, write_position))
+			if (E_SUCCESS != write_sflash_page(fd, page, write_position, random_access))
 			{
-				return E_FAILURE;
+				if ((true == random_access) && (false == first_page_written))
+				{
+					random_access = false;
+					printf("Retrying to send flash pages in legacy access mode:\n0x%04X:", page); fflush(stdout);
+					if (E_SUCCESS != write_sflash_page(fd, page, write_position, random_access))
+					{
+						return E_FAILURE;
+					}
+				}
+				else
+				{
+					return E_FAILURE;
+				}
 			}
-			else
+			first_page_written = true;
+			printf("W%s", verify_after_write?"":" "); fflush(stdout);
+			if (verify_after_write)
 			{
-				printf("V "); fflush(stdout);
+				if (E_SUCCESS != verify_sflash_page(fd, page, write_position))
+				{
+					return E_FAILURE;
+				}
+				else
+				{
+					printf("V "); fflush(stdout);
+				}
 			}
 		}
 		else
 		{
-			printf(" "); fflush(stdout);
+			printf("S%s ", verify_after_write?" ":""); fflush(stdout);
 		}
+
 		if (0 == (page + 1) % PRINT_ENTRIES_PER_LINE)
 		{
 			printf("\n");
@@ -196,15 +297,46 @@ int write_sflash_image(int fd, uint8_t const *buffer, bool verify_after_write)
 	}
 	printf("\n");
 
+	if (E_SUCCESS != write_factory_dataset(fd))
+	{
+		fprintf(stderr, "Command 0x35 to copy data into factory defaults section not successful.\n");
+		return E_FAILURE;
+	}
+
+	first_page_written = false;
 	return E_SUCCESS;
 }
 
-int write_sflash_page(int fd, uint16_t page, void const *buffer)
+int write_sflash_page(int fd, uint16_t page, void const *buffer, bool random_access)
 {
 	struct flash_block_t message;
 	uint8_t *data = (uint8_t *) buffer;
 
-	message.cmd = RADTEL_CMD_WRITE_BLOCK;
+	if (true == random_access)
+	{ message.cmd = RADTEL_CMD_WRITE_BLOCK; }
+	else if (page < (RADTEL_ADDR_AUDIO + RADTEL_SIZE_AUDIO))
+	{ message.cmd = RADTEL_CMD_WRITE_AUDIO; }
+	else if ((page >= RADTEL_ADDR_2D0) && (page < (RADTEL_ADDR_2D0 + RADTEL_SIZE_2D0)))
+	{ message.cmd = RADTEL_CMD_WRITE_2D0; page -= RADTEL_ADDR_2D0; }
+	else if ((page >= RADTEL_ADDR_FONT_EXT) && (page < (RADTEL_ADDR_FONT_EXT + RADTEL_SIZE_FONT_EXT)))
+	{ message.cmd = RADTEL_CMD_WRITE_FONT_EXT; page -= RADTEL_ADDR_FONT_EXT; }
+	else if ((page >= RADTEL_ADDR_FONT_STD) && (page < (RADTEL_ADDR_FONT_STD + RADTEL_SIZE_FONT_STD)))
+	{ message.cmd = RADTEL_CMD_WRITE_FONT_STD; page -= RADTEL_ADDR_FONT_STD; }
+	else if ((page >= RADTEL_ADDR_IMG_LOGO) && (page < (RADTEL_ADDR_IMG_LOGO + RADTEL_SIZE_IMG_LOGO)))
+	{ message.cmd = RADTEL_CMD_WRITE_IMG_LOGO; page -= RADTEL_ADDR_IMG_LOGO; }
+	else if (page == RADTEL_ADDR_CALIBRATION)
+	{ message.cmd = RADTEL_CMD_WRITE_CALIBRATION; page -= RADTEL_ADDR_CALIBRATION; }
+	else if ((page >= RADTEL_ADDR_SETTINGS) && (page < (RADTEL_ADDR_SETTINGS + RADTEL_SIZE_SETTINGS)))
+	{ message.cmd = RADTEL_CMD_WRITE_SETTINGS; page -= RADTEL_ADDR_SETTINGS; }
+	else if ((page >= RADTEL_ADDR_3D8) && (page < (RADTEL_ADDR_3D8 + RADTEL_SIZE_3D8)))
+	{ message.cmd = RADTEL_CMD_WRITE_3D8; page -= RADTEL_ADDR_3D8; }
+	else if ((page >= RADTEL_ADDR_31C) && (page < (RADTEL_ADDR_31C + RADTEL_SIZE_31C)))
+	{ message.cmd = RADTEL_CMD_WRITE_31C; page -= RADTEL_ADDR_31C; }
+	else
+	{
+		fprintf(stderr, "Warning: Trying to flash page to sparse area. Nothing written.\n");
+		return E_FAILURE;
+	}
 
 	for (uint8_t block_num = 0; block_num < SFLASH_PAGE_SIZE / BLOCK_SIZE; block_num++)
 	{
@@ -221,7 +353,7 @@ int write_sflash_page(int fd, uint16_t page, void const *buffer)
 		}
 		
 		uint8_t response;
-		if (1 != serial_receive(fd, &response, 1, 2.0))
+		if (1 != serial_receive(fd, &response, 1, random_access?2.0:20.0))
 		{
 			fprintf(stderr, "\nError receiving flash block response from device.\n");
 			return E_FAILURE;
@@ -229,6 +361,7 @@ int write_sflash_page(int fd, uint16_t page, void const *buffer)
 		if (RADTEL_RECV_OK != response)
 		{
 			fprintf(stderr, "\nError writing flash page. Device returned negative response.\n");
+			serial_flush(fd);
 			return E_FAILURE;
 		}
 		data += BLOCK_SIZE;

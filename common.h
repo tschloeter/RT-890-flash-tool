@@ -39,13 +39,51 @@
 #define RADTEL_RECV_NOK							(0xFF)
 #define PRINT_ENTRIES_PER_LINE					(16)
 
+
 enum radtel_cmd_t
 {
 	RADTEL_CMD_NOP					= 0x32u,
+	RADTEL_CMD_PROG_SESSION			= 0x35u,
 	RADTEL_CMD_ERASE_FLASH			= 0x39u,
 	RADTEL_CMD_READ_BLOCK			= 0x52u, // Parameters: 128 byte-Block Address (16 bit), Checksum
 	RADTEL_CMD_WRITE_BLOCK			= 0x57u, // Parameters: 128 byte-Block Address (16 bit), 128 bytes, Checksum
+	RADTEL_CMD_WRITE_AUDIO			= 0x40u,
+	RADTEL_CMD_WRITE_2D0			= 0x41u,
+	RADTEL_CMD_WRITE_FONT_EXT		= 0x42u,
+	RADTEL_CMD_WRITE_FONT_STD		= 0x43u,
+	RADTEL_CMD_WRITE_IMG_LOGO		= 0x47u,
+	RADTEL_CMD_WRITE_CALIBRATION	= 0x48u, // Auto-triggers device-side backup on write
+	RADTEL_CMD_WRITE_SETTINGS		= 0x49u, // Auto-triggers device-side backup on write
+	RADTEL_CMD_WRITE_3D8			= 0x4Bu, // Partial extended settings area
+	RADTEL_CMD_WRITE_31C			= 0x4Cu
 };
+
+enum radtel_addr_t
+{
+	RADTEL_ADDR_AUDIO		= 0x0000,
+	RADTEL_ADDR_2D0			= 0x02D0,
+	RADTEL_ADDR_FONT_EXT	= 0x02F8,
+	RADTEL_ADDR_FONT_STD	= 0x031A,
+	RADTEL_ADDR_31C			= 0x031C,
+	RADTEL_ADDR_IMG_LOGO	= 0x03B5,
+	RADTEL_ADDR_CALIBRATION	= 0x03BF,
+	RADTEL_ADDR_SETTINGS	= 0x03C1,
+	RADTEL_ADDR_3D8			= 0x03D8
+};
+
+enum radtel_size_t
+{
+	RADTEL_SIZE_AUDIO		= 0x02D0,
+	RADTEL_SIZE_2D0			= 0x0028,
+	RADTEL_SIZE_FONT_EXT	= 0x0022,
+	RADTEL_SIZE_FONT_STD	= 0x0002,
+	RADTEL_SIZE_31C			= 0x0099,
+	RADTEL_SIZE_IMG_LOGO	= 0x000A,
+	RADTEL_SIZE_CALIBRATION	= 0x0001,
+	RADTEL_SIZE_SETTINGS	= 0x000A,
+	RADTEL_SIZE_3D8			= 0x000A
+};
+
 
 struct flash_block_t
 {

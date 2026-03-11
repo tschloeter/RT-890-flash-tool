@@ -41,7 +41,7 @@ void *read_sflash_image(int fd);
 int read_sflash_page(int fd, uint16_t page, void *buf);
 int flash_spi_memory(int fd_serial, char const *sflash_output_image, bool verify_after_write);
 int write_sflash_image(int fd, uint8_t const *buffer, bool verify_after_write);
-int write_sflash_page(int fd, uint16_t page, void const *buffer);
+int write_sflash_page(int fd, uint16_t page, void const *buffer, bool random_access);
 int verify_sflash_page(int fd, uint16_t page, uint8_t const *buffer);
 
 #endif

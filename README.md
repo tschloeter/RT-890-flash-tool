@@ -5,10 +5,11 @@ An open-source tool for flashing and backing up the firmware and SPI flash data 
 
 ## Features
 - Read and backup SPI flash contents
-- Program SPI flash with binary files
+- Program SPI flash from binary files
 - Flash the system firmware
-- Erase the flash memory
+- Erase the firmware flash memory
 - Serial communication with selectable baud rates
+- Support random access using 0x57 command as well as legacy flashing using 0x40..0x4C commands
 
 ## Requirements
 - GCC (Linux or Windows, MinGW)
@@ -65,6 +66,12 @@ This will create the executable `rt890-spi-flasher` (or `rt890-spi-flasher.exe` 
 
 ```sh
 ./rt890-spi-flasher -p /dev/ttyUSB0 -e
+```
+
+**Combine firmware flashing, SPI flash dump, SPI flash and verify in one command**
+
+```sh
+./rt-890-spi-flasher -p /dev/ttyUSB0 -s firmware.bin -r spiflash-backup.bin -f -w spiflash-new.bin -v
 ```
 
 ## License

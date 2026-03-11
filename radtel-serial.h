@@ -41,6 +41,7 @@ enum radtel_mode_t
 uint8_t checksum(uint8_t const *data, ssize_t size);
 int serial_open(char const *device, speed_t speed);
 void serial_close(int fd);
+void serial_flush(int fd);
 int serial_set_flags(int fd, speed_t baud);
 ssize_t serial_receive(int fd, void *buf, ssize_t size, double timeout_sec);
 ssize_t serial_send(int fd, void *buf, ssize_t size);

@@ -148,9 +148,9 @@ int erase_firmware(int fd_serial)
 		return E_FAILURE;
 	}
 
-	while(0 < read(fd_serial, &response, 1));
+	serial_flush(fd_serial);
 
-	printf("Erasing flash memory...\n");
+	printf("Executing Erase Flash Memory Subcommand 0x55...\n");
 
 	// Altering bytes 3 (subfunction?) to 0x55 lets the radio erase MCU's internal flash.
 	message[3] = 0x55;

@@ -67,13 +67,11 @@ uint8_t checksum(uint8_t const *data, ssize_t size)
 
 int check_communication_to_device(int fd_serial)
 {
-	uint8_t dummy_buffer;
 	uint8_t read_message[] = { RADTEL_CMD_READ_BLOCK, 0x00, 0x00, RADTEL_CMD_READ_BLOCK };
 	uint8_t retry_count = 3;
 	uint8_t response = 0;	
 
-	// Flush any existing data in the serial buffer
-	while(0 < read(fd_serial, &dummy_buffer, 1));
+	serial_flush(fd_serial);
 
 	do
 	{
@@ -89,7 +87,7 @@ int check_communication_to_device(int fd_serial)
 			return RADTEL_MODE_UNKNOWN;
 		}
 
-		while(0 < read(fd_serial, &dummy_buffer, 1));
+		serial_flush(fd_serial);
 
 		switch (response)
 		{
@@ -156,6 +154,12 @@ int serial_open(char const *device, speed_t speed)
 	}
 
 	return fd;
+}
+
+void serial_flush(int fd)
+{
+	uint8_t dummy_buffer;
+	while(0 < read(fd, &dummy_buffer, 1));
 }
 
 void serial_close(int fd)
